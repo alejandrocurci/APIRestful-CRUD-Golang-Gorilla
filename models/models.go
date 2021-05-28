@@ -2,6 +2,11 @@ package models
 
 import "time"
 
+type CustomResponse struct {
+	Status      string `json:"status"`
+	Description string `json:"description"`
+}
+
 type Message struct {
 	Author  string    `json:"author"`
 	Content string    `json:"content"`

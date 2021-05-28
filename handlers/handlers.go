@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -22,10 +21,11 @@ func GetMessages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	j, err := json.Marshal(messages)
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+		w.Write(j)
 	}
-	w.WriteHeader(http.StatusOK)
-	w.Write(j)
 }
 
 func CreateMessage(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +33,8 @@ func CreateMessage(w http.ResponseWriter, r *http.Request) {
 	var msg models.Message
 	err := json.NewDecoder(r.Body).Decode(&msg)
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	// set current time and save in database
 	msg.SentAt = time.Now()
@@ -43,10 +44,11 @@ func CreateMessage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	j, err := json.Marshal(msg)
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+		w.Write(j)
 	}
-	w.WriteHeader(http.StatusCreated)
-	w.Write(j)
 }
 
 func UpdateMessage(w http.ResponseWriter, r *http.Request) {
@@ -55,25 +57,39 @@ func UpdateMessage(w http.ResponseWriter, r *http.Request) {
 	idStr := params["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	// msg is the updated message
 	var msg models.Message
 	err = json.NewDecoder(r.Body).Decode(&msg)
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	// m is the original message
 	// update message if found
+	var response models.CustomResponse
+	w.Header().Set("Content-Type", "application/json")
 	if m, ok := models.MessageStore.Data[id]; ok {
 		msg.SentAt = m.SentAt
 		delete(models.MessageStore.Data, id)
 		models.MessageStore.Data[id] = msg
-		log.Print("successful update")
+		response.Status = "Success"
+		response.Description = "Message has been updated"
+		w.WriteHeader(http.StatusOK)
 	} else {
-		log.Print("id not found")
+		response.Status = "Failed"
+		response.Description = "Message has not been found"
+		w.WriteHeader(http.StatusNotFound)
 	}
-	w.WriteHeader(http.StatusNoContent)
+	// parse struct to json and send it back in response
+	j, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	} else {
+		w.Write(j)
+	}
 }
 
 func DeleteMessage(w http.ResponseWriter, r *http.Request) {
@@ -82,14 +98,27 @@ func DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	idStr := params["id"]
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	// delete the message if found
+	var response models.CustomResponse
+	w.Header().Set("Content-Type", "application/json")
 	if _, ok := models.MessageStore.Data[id]; ok {
 		delete(models.MessageStore.Data, id)
-		log.Print("successful delete")
+		response.Status = "Success"
+		response.Description = "Message has been deleted"
+		w.WriteHeader(http.StatusOK)
 	} else {
-		log.Print("id not found")
+		response.Status = "Failed"
+		response.Description = "Message has not been found"
+		w.WriteHeader(http.StatusNotFound)
 	}
-	w.WriteHeader(http.StatusNoContent)
+	// parse struct to json and send it back in response
+	j, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	} else {
+		w.Write(j)
+	}
 }
